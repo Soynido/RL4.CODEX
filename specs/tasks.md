@@ -10,7 +10,7 @@
 | TASK-006 | P0 | Créer un dossier `examples/` avec plusieurs payloads RL4-CODEX commentés + use cases détaillés. | `specs/plan.md` Phase 2, `spec.md` §§3‑8 | DONE |
 | TASK-007 | P0 | Réécrire `README.md` en documentation d’accueil de niveau RFC (objectifs, prompts, quick start, use cases, contribution). | `specs/plan.md` Phase 2, user brief 2025-11-26 | DONE |
 | TASK-008 | P0 | Mettre à jour `spec.md` vers RL4-CODEX v1.2 avec terminologie normative, règles d’ordre canonique, hashing, taille et compatibilité. | `specs/plan.md` Phase 2, user brief 2025-11-26 | DONE |
-| TASK-009 | P0 | Rédiger `decoder.md` décrivant la spécification de décodage et la reconstruction de `CognitiveState`. | `specs/plan.md` Phase 2, user brief 2025-11-26 | PENDING |
+| TASK-009 | P0 | Rédiger `decoder.md` décrivant la spécification de décodage et la reconstruction de `CognitiveState`. | `specs/plan.md` Phase 2, user brief 2025-11-26 | DONE |
 
 > Règles : une tâche par commit, validation via audit MCP Playwright après implémentation, références strictes à `spec.md`/`plan.md`.
 
