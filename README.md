@@ -1,88 +1,113 @@
 # RL4.CODEX
 
-> RL4-CODEX v1.0 — Universal LLM cognitive snapshot standard  
-> _Copy one block of text, resume any project anywhere._
+> RL4-CODEX Dual-Mode — Simple Mode (v1.0) + Complex Mode (v1.1)  
+> _Copy/paste snapshots or fragments and resume anywhere._
 
 ---
 
 ## 1. What is RL4-CODEX?
-RL4-CODEX is a lightweight text standard that captures your working memory—persona, state, goals, decisions, tasks, and style—inside a single `<RL4-CODEX>` payload. Copy it from one chat window, paste it into another LLM, and continue instantly. No SDKs, no extensions, no vendor lock-in.
+RL4-CODEX is the universal, text-only way to save and reload your cognitive state across any LLM.  
+**Simple Mode (v1.0)** = one self-contained `<RL4-CODEX>` block.  
+**Complex Mode (v1.1)** = one full snapshot plus optional fragments to journal changes over time.
 
 ---
 
-## 2. Why it matters
-- **Continuity** — Switch between GPT, Claude, Gemini, etc. without re-explaining.  
-- **Portability** — Works offline, in docs, in terminals, anywhere text is allowed.  
-- **Safety** — Designed to prevent raw code or secrets from leaking.  
-- **Determinism** — Canonical block order keeps snapshots predictable.  
-- **Extensibility** — Future versions can add blocks without breaking today’s payloads.
+## 2. Choosing the Right Mode
+| Mode | Use When | Snapshot Structure |
+| --- | --- | --- |
+| Simple (v1.0) | Short sessions, quick handoffs, non-technical users | Single `<RL4-CODEX v="1.0">` block with identity → rules |
+| Complex (v1.1) | Multi-day work, research logs, multi-LLM teams | `<RL4-CODEX v="1.1">` + zero or more `<RL4-CODEX-FRAGMENT v="1.0">` blocks |
+
+Fragments never repeat identity—they just capture incremental updates (new context, decisions, tasks, notes).
 
 ---
 
-## 3. Quick Start (No Tools Needed)
-
-### A. Encode your state
-1. Open your favorite LLM.  
-2. Paste the “Snapshot Generator Prompt” from [`prompts.md`](prompts.md).  
-3. Answer the clarifying questions (persona, goals, tasks, etc.).  
-4. Copy the `<RL4-CODEX v="1.0">` payload it returns.
-
-### B. Load it elsewhere
-1. Open any other LLM (or the same one later).  
-2. Paste the “Snapshot Loader Prompt” from [`prompts.md`](prompts.md).  
-3. When asked, paste your saved snapshot.  
-4. The model summarizes the context and asks what you want to do next.
-
-Done—you just teleported your context.
+## 3. Quick Start — Simple Mode
+1. Open any LLM and paste the **Simple Mode Snapshot Generator** prompt from [`prompts.md`](prompts.md).  
+2. Answer the questions (identity, goals, constraints, tasks, rules).  
+3. Copy the `<RL4-CODEX v="1.0">` block you receive.  
+4. In another LLM, paste the **Simple Mode Loader** prompt, then paste your snapshot when asked.  
+5. Continue working—your context just teleported.
 
 ---
 
-## 4. Repository Guide
+## 4. Quick Start — Complex Mode with Fragments
+1. Encode the baseline `<RL4-CODEX v="1.1">` snapshot using the Complex Mode generator prompt.  
+2. As work progresses, paste the **Fragment Generator** prompt to create timestamped `<RL4-CODEX-FRAGMENT>` updates (e.g., new tasks, context, decisions).  
+3. When switching LLMs, provide the Complex Mode loader with the full snapshot plus every fragment (chronological order).  
+4. The loader merges fragments, surfaces conflicts, and resumes exactly where you left off.
+
+**Fragment Workflow (Non-Technical Explanation)**  
+Think of fragments as sticky notes you append to the main document. The loader reads the document, then applies each note in timestamp order, with the latest note overriding earlier details if they collide.
+
+---
+
+## 5. Repository Guide
 | File | Purpose |
 | --- | --- |
-| `spec.md` | Authoritative v1.0 standard: data model, serialization, size rules, examples. |
-| `prompts.md` | Canonical encoder/loader prompts (copy/paste friendly). |
-| `compliance.md` | Behavioral contract for LLMs acting as encoders or loaders. |
-| `roundtrip.md` | Multi-model test plan to verify snapshots survive encode ↔ load loops. |
-| `examples.md` | Good / bad snapshots, minimal payload, truncation behavior. |
-| `roadmap.md` | v1.1 & v2.0 direction + adoption strategy. |
-| `examples/` | Raw `.codex` payloads for demos (legacy artifacts). |
+| `spec.md` | Official dual-mode specification (Simple + Complex + fragments). |
+| `prompts.md` | Five canonical prompts (Simple generator/loader, fragment generator, merge assistant, complex loader). |
+| `compliance.md` | MUST/SHOULD/MAY requirements for encoders, loaders, and fragment handling. |
+| `roundtrip.md` | Test protocol covering Simple round trips and Complex fragment merges across LLMs. |
+| `examples.md` | Narrative guidance plus good/bad payloads and truncation behavior. |
+| `examples/` | Concrete `.md` payloads (Simple snapshot, full v1.1, fragment set, merged output). |
+| `roadmap.md` | Plans for v1.1 (metadata) and v2.0 (compression + validation toolkit). |
 
 ---
 
-## 5. Example Snapshot
+## 6. Simple Mode Example
 ```
 <RL4-CODEX v="1.0">
-  <IDENTITY>persona=Product Engineering Lead | project=Atlas Mobile 2.3 | style=decisive</IDENTITY>
-  <STATE>mode=focus | phase=release candidate | focus=stabilize push notifications | energy=steady</STATE>
-  <GOALS>short_term=close crashers, finish load tests | long_term=reduce latency</GOALS>
-  <CONTEXT>constraints=ship by Friday | assets=QA dashboard | stakeholders=mobile PM</CONTEXT>
-  <DECISIONS>recent=freeze feature flags | rationale=protect stability | impacts=feature debt grows</DECISIONS>
-  <TASKS>priority_list=1) triage crashes ; 2) rerun soak tests ; 3) prep release note</TASKS>
-  <STYLE>tone=direct | communication=hourly bullet update | preferences=cite metrics first</STYLE>
+USER_IDENTITY: Product Engineering Lead for Atlas Mobile 2.3
+USER_PREFERENCES: concise bullet replies, cite metrics first
+WORK_STYLE: decisive, expects explicit next steps
+CONTEXT_SUMMARY: stabilizing push notifications, RC week
+ACTIVE_GOALS: close crashers, finish load tests, prep release doc
+DECISIONS:
+  - freeze feature flags
+  - run nightly soak tests before sign-off
+TASKS:
+  1) triage crash signatures
+  2) rerun soak tests
+  3) draft release email
+CONSTRAINTS: ship by Friday, no DB migrations, downtime <30s
+NEXT_STEPS: rerun soak tests tonight, compare metrics, notify PM
+LLM_BEHAVIOR_RULES: keep answers <150 words, confirm constraints before suggestions
 </RL4-CODEX>
 ```
-Fits in a tweet thread, yet carries everything another model needs to continue.
 
 ---
 
-## 6. Edge Cases & Limitations
-- **Payload too long?** Trim GOALS/TASKS, replace lists with summaries, or move meta-notes into `<OPTIONAL>`.  
-- **Sensitive content?** Hash identifiers or describe them abstractly. Never paste raw code or secrets.  
-- **Truncated block?** Loaders must stop, warn, and request a resend (see `examples.md`).  
-- **Multiple snapshots?** Name them clearly or store in versioned docs; never merge two payloads.
+## 7. Complex Mode Example (Snapshot + Fragments)
+See `/examples/full-snapshot-v1.1.md` for the base snapshot, plus `/examples/fragment-1.md` and `/examples/fragment-2.md` for incremental updates.  
+`/examples/merged-snapshot-example.md` shows the result after applying both fragments in chronological order.
 
 ---
 
-## 7. Contributing
-1. Review `roadmap.md` + open issues.  
-2. Propose a change (spec, prompts, tests, examples).  
-3. Work on a feature branch and include updated docs/tests.  
-4. Submit a PR referencing the relevant roadmap goal.  
-5. Pass the round-trip protocol before claiming compliance.
+## 8. Round Trip Expectations
+- **Simple Mode:** Encode → Load → Re-encode → Compare. Fields must match semantically.  
+- **Complex Mode:** Encode → Add fragments → Load + Merge → Re-encode → Compare merged result.  
+- Details and multi-model matrices live in [`roundtrip.md`](roundtrip.md).
 
 ---
 
-## 8. License
-MIT — build on it, remix it, embed it anywhere. Just keep the format open and interoperable.
+## 9. Edge Cases & Limitations
+- Oversized payload? Summarize goals/tasks or archive older fragments.  
+- Sensitive content? Hash or describe abstractly—never paste raw code or secrets.  
+- Missing fragment? Loader must warn and request it instead of guessing.  
+- Conflicts? Loader surfaces them verbatim and asks which version to keep.
+
+---
+
+## 10. Contributing
+1. Review `spec.md`, `compliance.md`, and `roadmap.md`.  
+2. Discuss changes via issue/PR (one feature per PR).  
+3. Provide updated examples/tests plus round-trip evidence.  
+4. Keep documentation copy/paste friendly.  
+5. License remains MIT—everything stays open.
+
+---
+
+## 11. License
+MIT License — free to adopt, fork, and extend as long as the standard stays interoperable.
 

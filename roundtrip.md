@@ -1,68 +1,87 @@
-# RL4-CODEX v1.0 Round-Trip Reliability Protocol
+# RL4-CODEX Dual-Mode Round-Trip Protocol
 
-This procedure validates that snapshots remain stable when passed between different LLMs or humans. Follow it to certify multi-model interoperability.
-
----
-
-## 1. Test Overview
-1. **Encode** — Model A (Encoder) generates an RL4-CODEX snapshot from a controlled brief.  
-2. **Load** — Model B (Loader) ingests the snapshot, restates context, and reports readiness.  
-3. **Re-Encode** — Model B immediately re-encodes the state based on its understanding.  
-4. **Re-Load** — Model A loads Model B’s snapshot.  
-5. **Compare** — Humans compare the original and round-tripped snapshots for semantic equivalence.
-
-This completes one “round trip”. Perform at least three trips per pairing to establish stability.
+This protocol verifies that both Simple Mode (v1.0) and Complex Mode (v1.1) snapshots survive encode → load → re-encode cycles across multiple LLMs without semantic drift.
 
 ---
 
-## 2. Semantic Equivalence Criteria
-Snapshots are considered equivalent when:
-- All CORE fields convey the same meaning, even if wording differs.  
-- Ordered lists (e.g., `priority_list`) preserve their order and essence.  
-- Styles, constraints, and decisions remain aligned (no contradictions).  
-- Optional telemetry may differ (e.g., new checksum) as long as CORE intent is intact.
+## 1. Simple Mode Round Trip (v1.0)
+1. **Encode S₁** — Model A runs the Simple Mode generator prompt and produces `<RL4-CODEX v="1.0">`.  
+2. **Load** — Model B runs the Simple Mode loader prompt, confirms understanding, and states readiness.  
+3. **Re-Encode S₂** — Model B immediately re-encodes the same context (still in Simple Mode).  
+4. **Re-Load** — Model A loads S₂.  
+5. **Compare** — Humans verify S₁ vs S₂ for semantic equivalence.
 
-Any drift that changes goals, decisions, or priority ordering counts as a failure.
+Repeat at least three times per model pairing. Any change to identity, goals, decisions, constraints, tasks, or behavior rules counts as a failure.
 
 ---
 
-## 3. Failure Modes & Remedies
+## 2. Complex Mode Round Trip (v1.1 + fragments)
+1. **Encode Sfull** — Model A creates `<RL4-CODEX v="1.1">`.  
+2. **Generate Fragments F₁..Fₙ** — Over time, Model A (or the user) produces `<RL4-CODEX-FRAGMENT v="1.0">` entries.  
+3. **Transfer Set** — Provide Sfull plus all fragments (sorted by timestamp) to Model B.  
+4. **Load + Merge** — Model B runs the Complex Mode loader prompt, merges fragments, surfaces conflicts, and continues the session.  
+5. **Re-Encode Sfull₂** — After acting, Model B emits a refreshed `<RL4-CODEX v="1.1">` plus new fragments if needed.  
+6. **Re-Load** — Model A loads Sfull₂ (and any new fragments) to confirm continuity.  
+7. **Compare** — Human reviewers diff Sfull vs Sfull₂, ensuring the fragment history was honored.
+
+Criteria:
+- All fragments applied in chronological order (latest wins).  
+- Identity and constraints unchanged.  
+- Conflicts surfaced explicitly.  
+- Tasks/goals ordering preserved unless the fragment intentionally changed it.  
+- Notes/history fields may grow, but meaning must remain intact.
+
+---
+
+## 3. Semantic Equivalence Criteria
+Snapshots/fragments are equivalent when:
+- Identity, constraints, reasoning style, and behavior rules communicate the same instructions.  
+- Goals and tasks retain their order and intent.  
+- Decisions/next steps remain logically consistent.  
+- Fragment merges do not lose data; new fragments only add or override explicitly.  
+- Optional metadata (checksums, vendor tags) may differ.
+
+---
+
+## 4. Failure Modes & Remedies
 | Failure | Symptom | Remedy |
 | --- | --- | --- |
-| Missing block | Loader refuses or hallucinated data | Re-run encoding with generator prompt, ensure fields captured |
-| Inflation | Payload exceeds 4 KB after round trip | Compress clauses, remove filler words |
-| Style drift | Tone/communication preferences mutate | Remind loaders to quote STYLE as-is |
-| Task reordering | Priority sequence changes | Require loaders to restate tasks verbatim before re-encoding |
-| Lossy goals | Short or long-term goals disappear | Add explicit checklist verifying GOALS content |
+| Missing field | Loader invents or omits required sections | Re-run generator, ensure all 10 Simple Mode fields present |
+| Fragment drop | Later snapshot lacks updates from Fᵢ | Enforce timestamp sorting and checksum fragments in CI |
+| Conflict silence | Competing fragments overwrite silently | Loader MUST emit `CONFLICT:` lines and request direction |
+| Inflation | Payload grows beyond 4 KB (Simple) or 10 KB total | Summarize goals/tasks, archive stale fragments |
+| Order drift | Priority or chronology changes unintentionally | Require loaders to quote existing tasks before editing |
 
 ---
 
-## 4. Multi-Model Test Matrix
-| Pair | Direction | Notes |
-| --- | --- | --- |
-| GPT-4 → Claude 3 → GPT-4 | Encode → Load → Re-encode → Load | Baseline comparison |
-| Claude 3 → Gemini 1.5 → Claude 3 | Tests non-OpenAI bridging |
-| GPT-4 → Command R+ → GPT-4 | Checks instruction-heavy compliance |
-| Mistral Large → GPT-4 → Mistral Large | Ensures open-weight compatibility |
+## 5. Cross-LLM Test Matrix
+| Flow | Purpose |
+| --- | --- |
+| GPT-4 → Claude 3 → GPT-4 | Baseline compliance (Simple + Complex) |
+| Claude 3 → Gemini 1.5 → Claude 3 | Confirms non-OpenAI interoperability |
+| GPT-4 → Command R+ → GPT-4 | Stress-tests instruction-heavy models |
+| Mistral Large → GPT-4 → Mistral Large | Ensures open-weight ↔ hosted compatibility |
+| GPT-4 → Claude 3 (fragments only) | Validates fragment-only updates with no new full snapshot |
 
-Teams SHOULD cover at least two distinct vendor pairs before declaring production readiness.
-
----
-
-## 5. Execution Checklist
-- [ ] Provide identical briefs to all encoders (persona, goals, constraints, tasks).  
-- [ ] Log each payload verbatim with timestamps.  
-- [ ] Record loader summaries to inspect for hallucinations.  
-- [ ] Run diff tooling on the original vs round-tripped snapshots, focusing on CORE blocks.  
-- [ ] File issues for any drift and iterate on prompts until results stabilize.  
-- [ ] Store validated payloads in `examples/` for future regressions.
+Teams SHOULD complete at least two distinct vendor paths per mode before claiming production readiness.
 
 ---
 
-## 6. Automation Hints
-- Use a spreadsheet to track payload sizes, drift notes, and compliance status.  
-- Consider hashing each block to detect subtle alterations (e.g., SHA-1 per block).  
-- When models disagree, run a third “arbiter” model to identify discrepancies objectively.
+## 6. Execution Checklist
+- [ ] Use identical briefs for all encoders (identity, goals, tasks, constraints).  
+- [ ] Log every snapshot and fragment verbatim with timestamps.  
+- [ ] Track payload sizes and note when compression is required.  
+- [ ] Store loader summaries to inspect for hallucinations/conflict handling.  
+- [ ] Diff snapshots/fragment histories after each cycle (manual or scripted).  
+- [ ] Archive validated examples inside `examples/merged-snapshot-example.md`.
 
-Consistent, lossless round trips are mandatory before RL4-CODEX can be advertised as production-ready in a given workflow.
+---
+
+## 7. Automation Hints
+- Hash each block (or fragment) to detect silent alterations.  
+- Use spreadsheets or CI to track equivalence verdicts across model pairs.  
+- Introduce a neutral “arbiter” model when teams disagree on drift.  
+- For Complex Mode, maintain a manifest (`timestamp`, `hash`, `type`) for every fragment so missing entries are obvious.
+
+Consistent, lossless round trips are mandatory before advertising RL4-CODEX compatibility.
 

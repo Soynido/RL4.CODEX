@@ -1,170 +1,229 @@
-# RL4-CODEX v1.0 — Universal Cognitive Snapshot Standard
+# 🏛️ Official Spec — RL4.CODEX Dual-Mode (v1.0 + v1.1)
 
-Status: Production-ready  
-Maintainer: R-Labs  
-Date: 2025-11-26
+RL4.CODEX — Dual-Mode Cognitive Snapshot Standard  
+Version: 1.1
+
+Modes:
+- v1.0 — Simple Mode (full snapshot only)
+- v1.1 — Complex Mode (full snapshot + fragments)
 
 ---
 
-## 1. Purpose & Rationale
-RL4-CODEX v1.0 defines a text-only, LLM-agnostic snapshot format that captures a user’s active cognitive state and makes it portable across chats, devices, or models. Any human can copy a `<RL4-CODEX>` block, paste it into any LLM, and resume work instantly—without tools, code, or integrations. The standard prioritizes determinism, human readability, and forward compatibility so that identical inputs always produce identical snapshots under 4 KB.
+## 1. Purpose
+RL4.CODEX defines a universal, LLM-agnostic, text-only cognitive snapshot format, allowing any user to save, reload, transfer, and continue their cognitive state across any LLM model or platform.
 
-## 2. Guiding Principles
-1. **Universal Access** — Works in any editor, chat box, or model with plain text.  
-2. **Deterministic Structure** — Canonical ordering, stable field names, minimal punctuation.  
-3. **No Content Leakage** — Semantic summaries only; never raw code, credentials, or proprietary text.  
-4. **Human-Friendly** — Short labels, simple grammar, copy/paste safe.  
-5. **Future-Proof** — Unknown fields must be ignored but preserved.  
-6. **Low Friction** — Entire payload recommended ≤ 4,096 bytes (hard cap 10,240 bytes).
+It enables:
+- Single-block context restoration (Simple Mode)
+- Incremental context journaling (Complex Mode)
+- Cross-model round-trip continuity
+- Long-term state portability
 
-## 3. Terminology
-- **Snapshot** — A single `<RL4-CODEX>` payload.  
-- **Encoder** — Human + LLM prompt that produces a snapshot.  
-- **Loader** — Human + LLM prompt that consumes a snapshot to rebuild context.  
-- **Token Stream** — Comma-separated clauses inside each block.  
-- **CORE Fields** — Mandatory data required for a valid snapshot.  
-- **OPTIONAL Fields** — Extensions that may appear without breaking compatibility.
+No tools, no extensions, no environment required. Only copy/paste.
 
-## 4. Data Model
-Every snapshot describes the same seven dimensions. CORE content is required; OPTIONAL content may appear anywhere inside the same block after the CORE entries.
+---
 
-| Block | Purpose | CORE Fields | OPTIONAL Fields |
-| --- | --- | --- | --- |
-| `IDENTITY` | Who is speaking & style | `persona`, `project`, `style` | `timezone`, `language`, `links` |
-| `STATE` | Current cognitive state | `mode`, `phase`, `focus`, `energy` | `risks`, `confidence` |
-| `GOALS` | Objectives snapshot | `short_term`, `long_term` | `done`, `blocked` |
-| `CONTEXT` | Constraints & environment | `constraints`, `assets`, `stakeholders` | `tools`, `repos`, `notes` |
-| `DECISIONS` | Active choices & ADRs | `recent`, `rationale`, `impacts` | `adr_refs`, `warnings` |
-| `TASKS` | Immediate next actions | `priority_list` (ordered) | `calendar`, `owner` |
-| `STYLE` | How to behave when resuming | `tone`, `communication`, `preferences` | `anti_patterns`, `guardrails` |
+## 2. Mode A — Simple Mode (v1.0)
 
-The OPTIONAL `<OPTIONAL>` block extends the payload with telemetry (`checksum`, `session`, `vendor`, etc.) but never replaces the CORE blocks.
+### 2.1 Overview
+Simple Mode uses one standalone block:
+```
+<RL4-CODEX v="1.0">
+  ...
+</RL4-CODEX>
+```
+It contains:
+- identity
+- goals
+- constraints
+- reasoning style
+- decisions
+- tasks
+- context summary
+- next steps
+- system expectations for the LLM
 
-## 5. Serialization Format
-1. Snapshots **MUST** use the exact wrapper:  
+It is complete and self-sufficient.
+
+### 2.2 Required Fields
+Each field MUST appear exactly once:
+- `USER_IDENTITY`
+- `USER_PREFERENCES`
+- `WORK_STYLE`
+- `CONTEXT_SUMMARY`
+- `ACTIVE_GOALS`
+- `DECISIONS`
+- `TASKS`
+- `CONSTRAINTS`
+- `NEXT_STEPS`
+- `LLM_BEHAVIOR_RULES`
+
+### 2.3 Behavior Contract
+LLMs MUST:
+- Load and interpret all fields
+- Maintain constraints and reasoning style
+- Continue the user’s workflow exactly
+- Not rewrite identity or change rules
+- Not hallucinate missing fields
+
+### 2.4 Use Cases
+- Short sessions
+- Beginners
+- Non-technical users
+- Simple context restoration
+- Switching models once or twice
+
+---
+
+## 3. Mode B — Complex Mode (v1.1)
+
+### 3.1 Overview
+Complex Mode adds incremental fragments: mini-snapshots representing partial updates.
+
+It consists of:
+1. Full snapshot:
    ```
-   <RL4-CODEX v="1.0">
+   <RL4-CODEX v="1.1">
      ...
    </RL4-CODEX>
    ```
-2. Blocks **MUST** appear in this canonical order: `IDENTITY`, `STATE`, `GOALS`, `CONTEXT`, `DECISIONS`, `TASKS`, `STYLE`, `OPTIONAL` (optional).  
-3. Each block contains short clauses separated by ` | `. Clauses use `label=value` or `label:comma-list`. Example: `mode=focus | phase=design`.  
-4. Whitespace between blocks is flexible; indentation is optional.  
-5. Encoders **MUST NOT** include HTML entities, Markdown formatting, or list bullets inside the block content.  
-6. Only ASCII characters are permitted; UTF-8 emoji **MAY** be used in OPTIONAL but should be avoided for maximum compatibility.  
-7. Duplicate labels inside the same block are invalid.
+2. 0 or more fragments:
+   ```
+   <RL4-CODEX-FRAGMENT v="1.0">
+     TIMESTAMP: ...
+     NEW_CONTEXT: [...]
+     UPDATED_DECISIONS: [...]
+     UPDATED_TASKS: [...]
+     NOTES: [...]
+   </RL4-CODEX-FRAGMENT>
+   ```
 
-## 6. Core Field Definitions
+Fragments allow incremental, chronological context accumulation.
 
-### 6.1 IDENTITY
-- `persona` (**MUST**) — Short description of the active role (e.g., “Lead Backend Engineer”).  
-- `project` (**MUST**) — High-level project nickname or hashed identifier.  
-- `style` (**MUST**) — Desired interaction style (`decisive`, `mentor`, `fast`).  
-- OPTIONAL: `timezone`, `language`, `links` (comma list of canonical references).
+### 3.2 Fragment Rules
+- A fragment MUST NOT contain identity fields.
+- A fragment MUST contain a TIMESTAMP.
+- A fragment MAY contain context, decisions, tasks, constraints, style updates.
+- A fragment MUST be mergeable with other fragments.
+- Latest fragment wins in conflicts.
 
-### 6.2 STATE
-- `mode` (**MUST**) — `focus`, `explore`, `debug`, or `planning`.  
-- `phase` (**MUST**) — Custom label for the current project phase.  
-- `focus` (**MUST**) — Single sentence describing cognitive focus.  
-- `energy` (**MUST**) — `high`, `steady`, or `low`.  
-- OPTIONAL: `risks`, `confidence` (0–1 float).
+### 3.3 Merging Algorithm
+Given:
+- Full snapshot `S`
+- Fragment list `F1..Fn` in chronological order
 
-### 6.3 GOALS
-- `short_term` (**MUST**) — Up to three bullet-equivalent phrases separated by commas.  
-- `long_term` (**MUST**) — Persistent north-star objectives.  
-- OPTIONAL: `done`, `blocked`.
-
-### 6.4 CONTEXT
-- `constraints` (**MUST**) — Policies, deadlines, or non-negotiables.  
-- `assets` (**MUST**) — Key artifacts (documents, repos) described abstractly.  
-- `stakeholders` (**MUST**) — Who must be satisfied; names may be hashed.  
-- OPTIONAL: `tools`, `repos`, `notes`.
-
-### 6.5 DECISIONS
-- `recent` (**MUST**) — Latest decision made (short clause).  
-- `rationale` (**MUST**) — Why the decision stands.  
-- `impacts` (**MUST**) — Expected outcomes or trade-offs.  
-- OPTIONAL: `adr_refs`, `warnings`.
-
-### 6.6 TASKS
-- `priority_list` (**MUST**) — Ordered actions encoded as `1) ... ; 2) ...`.  
-- OPTIONAL: `calendar` (relative timing), `owner`.
-
-### 6.7 STYLE
-- `tone` (**MUST**) — e.g., `direct`, `supportive`, `technical`.  
-- `communication` (**MUST**) — Preferred cadence or format.  
-- `preferences` (**MUST**) — Reusable heuristics (e.g., “cite specs before coding”).  
-- OPTIONAL: `anti_patterns`, `guardrails`.
-
-### 6.8 OPTIONAL Block
-- Extensible container for telemetry such as `checksum`, `session`, `vendor`, `ext.note`.  
-- MUST only appear after STYLE.  
-- MUST remain under 512 characters.
-
-## 7. Size & Performance
-- Total payload **MUST NOT** exceed 10,240 bytes.  
-- Encoders **SHOULD** keep payloads under 4,096 bytes.  
-- Blocks with more than 512 characters SHOULD be summarized further.  
-- Truncated payloads MUST still include all CORE blocks even if their contents degrade to `field=UNKNOWN`.
-
-## 8. Versioning & Compatibility
-- `v` attribute declares the snapshot format. v1.0 is the baseline.  
-- Future versions may add new blocks or fields but MUST preserve existing semantics.  
-- Decoders encountering newer versions MUST attempt to parse known blocks and treat unknown blocks as extensions.  
-- Encoders targeting older decoders MAY down-level by removing unknown fields while keeping canonical order.
-
-## 9. Error Handling
-- **Missing Block** — Payload is invalid; loader MUST request re-encode.  
-- **Missing Field** — Loader MUST treat as `field=UNKNOWN` and warn the user.  
-- **Duplicate Field** — Loader MUST keep the first occurrence and warn about duplicates.  
-- **Malformed Clause** — Loader MUST skip the clause, note the error, and continue if at least one valid clause remains per block.  
-- **Oversized Payload** — Loader SHOULD instruct the user to compress or split GOALS/TASKS.  
-- **Unknown Block** — Loader MUST ignore it but MAY echo it back untouched.
-
-## 10. Example Snapshot
+Apply:
 ```
-<RL4-CODEX v="1.0">
-  <IDENTITY>
-    persona=Lead Backend Engineer | project=NovaPay API rewrite | style=decisive
-  </IDENTITY>
-  <STATE>
-    mode=focus | phase=stabilization | focus=eliminate latency regressions | energy=steady
-    | risks=cache-invalidation, api-downtime
-  </STATE>
-  <GOALS>
-    short_term=ship hotfix, finish perf tests, sync with mobile team
-    | long_term=reach p95<120ms, enable zero-downtime deploys
-  </GOALS>
-  <CONTEXT>
-    constraints=PCI scope, downtime<30s | assets=perf dashboard, incident log
-    | stakeholders=payments squad, compliance lead
-  </CONTEXT>
-  <DECISIONS>
-    recent=freeze feature flags | rationale=reduce moving parts
-    | impacts=slower roadmap but safer rollout
-  </DECISIONS>
-  <TASKS>
-    priority_list=1) patch redis cluster ; 2) rerun soak tests ; 3) write rollout note
-  </TASKS>
-  <STYLE>
-    tone=direct | communication=bullet updates hourly | preferences=cite metrics before opinions
-  </STYLE>
-  <OPTIONAL>
-    session=hash#81aa | checksum=sha1#902fe1
-  </OPTIONAL>
-</RL4-CODEX>
+for fragment in fragments:
+    apply(fragment.changes)
 ```
 
-## 11. Validation Checklist
-Encoders SHOULD run the following before sharing a snapshot:
-1. All CORE blocks present and non-empty.  
-2. Field count per block ≤ 8 (to maintain readability).  
-3. Payload length < 4 KB (warning issued if above).  
-4. No raw credentials, code, or file paths.  
-5. Clauses use only ASCII punctuation and avoid Markdown bullets.  
-6. OPTIONAL block, if present, follows STYLE and stays under 512 characters.
+Override rules:
+- Fragment overrides snapshot fields where overlapping
+- Missing fields remain untouched
+- Conflicts MUST be surfaced
+- Unknown fields SHOULD be ignored
+
+### 3.4 Loader Requirements
+LLMs MUST:
+- Load full snapshot
+- Detect fragments
+- Merge fragments before generating NEXT_STEPS
+- Maintain consistency of identity and constraints
+- Warn if fragments conflict
+
+### 3.5 Use Cases
+- Long-running workflows
+- Research
+- Multi-day sessions
+- Multi-LLM collaboration
+- Journaling and progressive context accumulation
 
 ---
 
-**End of RL4-CODEX v1.0 Specification**
+## 4. Versioning Model
+- v1.0 — Simple Mode
+- v1.1 — Adds fragments (backward compatible)
+
+Future versions:
+- v1.2 = metadata
+- v2.0 = structural compression / auto-validation
+
+No breaking changes allowed until v2.x.
+
+---
+
+## 5. Example — Simple Mode Snapshot
+```
+<RL4-CODEX v="1.0">
+IDENTITY: ...
+GOALS: ...
+CONSTRAINTS: ...
+DECISIONS: [...]
+TASKS: [...]
+NEXT_STEPS: ...
+STYLE: ...
+</RL4-CODEX>
+```
+
+---
+
+## 6. Example — Complex Mode (v1.1)
+
+Full Snapshot:
+```
+<RL4-CODEX v="1.1">
+IDENTITY: ...
+GOALS: ...
+DECISIONS: [...]
+CONTEXT_SUMMARY: ...
+NEXT_STEPS: ...
+</RL4-CODEX>
+```
+
+Fragment #1:
+```
+<RL4-CODEX-FRAGMENT v="1.0">
+TIMESTAMP: 2025-11-26T10:14:20Z
+UPDATED_DECISIONS:
+  - clarified strategic objective X
+UPDATED_TASKS:
+  - added task "refactor section"
+</RL4-CODEX-FRAGMENT>
+```
+
+Fragment #2:
+```
+<RL4-CODEX-FRAGMENT v="1.0">
+TIMESTAMP: 2025-11-26T11:02:10Z
+NEW_CONTEXT:
+  - discussed design pattern Y
+NOTES:
+  - assistant agreed on constraint Z
+</RL4-CODEX-FRAGMENT>
+```
+
+---
+
+## 7. Round Trip Protocol (Dual-Mode)
+Simple Mode  
+S1 → Load → S2 → Compare
+
+Complex Mode  
+F1 → F2 → Sfull → Load → Merge → Continue → Sfull2 → Compare
+
+Semantic equivalence MUST be preserved.
+
+---
+
+## 8. Compliance Requirements
+LLMs MUST:
+- Respect protocol version
+- Respect field semantics
+- Preserve identity
+- Apply fragments chronologically
+- Not invent fields
+- Maintain reasoning constraints
+- Surface conflicts clearly
+
+🏁 FIN DES SPECS OFFICIELLES
 
