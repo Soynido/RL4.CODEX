@@ -1,180 +1,170 @@
-# RL4-CODEX v1.2 — Cognitive State Exchange Protocol (Normative Specification)
+# RL4-CODEX v1.0 — Universal Cognitive Snapshot Standard
 
-Status: Draft Standard  
+Status: Production-ready  
 Maintainer: R-Labs  
 Date: 2025-11-26
 
-## 1. Introduction
-RL4-CODEX defines a deterministic, content-safe method for serializing the cognitive state of an AI project or conversation into a compact payload that can be exchanged between large-language-model agents, IDE extensions, or automation frameworks without revealing raw code or proprietary text. Version 1.2 supersedes v1.1 while remaining backward compatible.
+---
 
-## 2. Conventions and Terminology
-- The key words **MUST**, **SHOULD**, **MAY**, **MUST NOT**, and **SHOULD NOT** are to be interpreted as described in RFC 2119.  
-- **CognitiveState**: Structured internal representation containing `ProjectContext`, `TemporalContext`, `CognitiveSignals`, `DecisionContext`, and `DeveloperProfile`.  
-- **Cycle**: A cohesive burst of reasoning or execution (e.g., edit, refactor, analysis).  
-- **Hashed Identifier**: A deterministic, non-reversible token (min. 8 base16 chars) prefixed with a namespace, e.g., `mod#1fa0`.  
-- **Token Stream**: Compact textual sequence separated by `|` or commas, with no JSON objects.  
-- **Unknown Tag**: Any XML-like element not defined in this specification; must be ignored but preserved when relaying payloads.
+## 1. Purpose & Rationale
+RL4-CODEX v1.0 defines a text-only, LLM-agnostic snapshot format that captures a user’s active cognitive state and makes it portable across chats, devices, or models. Any human can copy a `<RL4-CODEX>` block, paste it into any LLM, and resume work instantly—without tools, code, or integrations. The standard prioritizes determinism, human readability, and forward compatibility so that identical inputs always produce identical snapshots under 4 KB.
 
-## 3. Protocol Overview
-An RL4-CODEX payload is a single `<RL4-CODEX>` element containing five required child blocks and one OPTIONAL block. Each block carries semantic abstractions of the workspace state, recent activity, context, cognitive insights, and decisions. The protocol enforces canonical ordering, deterministic serialization, and strict zero-content rules.
+## 2. Guiding Principles
+1. **Universal Access** — Works in any editor, chat box, or model with plain text.  
+2. **Deterministic Structure** — Canonical ordering, stable field names, minimal punctuation.  
+3. **No Content Leakage** — Semantic summaries only; never raw code, credentials, or proprietary text.  
+4. **Human-Friendly** — Short labels, simple grammar, copy/paste safe.  
+5. **Future-Proof** — Unknown fields must be ignored but preserved.  
+6. **Low Friction** — Entire payload recommended ≤ 4,096 bytes (hard cap 10,240 bytes).
 
-## 4. Conformance Requirements
-### 4.1 Encoders MUST
-- Produce payloads with blocks ordered `DATA`, `TIMELINE`, `CONTEXT`, `INSIGHTS`, `DECISIONS`, `OPTIONAL`.  
-- Respect all hashing/normalization rules (Section 7).  
-- Guarantee payload size under 10,240 bytes (target ≤ 4,096 bytes).  
-- Emit only ASCII characters (UTF-8 encoded).  
-- Include all required blocks even if their contents are empty placeholders.  
-- Validate payloads against the algorithm in Section 10 before distribution.
+## 3. Terminology
+- **Snapshot** — A single `<RL4-CODEX>` payload.  
+- **Encoder** — Human + LLM prompt that produces a snapshot.  
+- **Loader** — Human + LLM prompt that consumes a snapshot to rebuild context.  
+- **Token Stream** — Comma-separated clauses inside each block.  
+- **CORE Fields** — Mandatory data required for a valid snapshot.  
+- **OPTIONAL Fields** — Extensions that may appear without breaking compatibility.
 
-### 4.2 Decoders MUST
-- Parse any payload that conforms to Sections 5–8.  
-- Treat missing fields within a block as `UNKNOWN`.  
-- Ignore and preserve unknown tags.  
-- Surface validation errors in a deterministic warning format (Section 11).  
-- Reconstruct a `CognitiveState` object as described in `decoder.md`.
+## 4. Data Model
+Every snapshot describes the same seven dimensions. CORE content is required; OPTIONAL content may appear anywhere inside the same block after the CORE entries.
 
-## 5. Canonical Payload Model
-### 5.1 Structure
+| Block | Purpose | CORE Fields | OPTIONAL Fields |
+| --- | --- | --- | --- |
+| `IDENTITY` | Who is speaking & style | `persona`, `project`, `style` | `timezone`, `language`, `links` |
+| `STATE` | Current cognitive state | `mode`, `phase`, `focus`, `energy` | `risks`, `confidence` |
+| `GOALS` | Objectives snapshot | `short_term`, `long_term` | `done`, `blocked` |
+| `CONTEXT` | Constraints & environment | `constraints`, `assets`, `stakeholders` | `tools`, `repos`, `notes` |
+| `DECISIONS` | Active choices & ADRs | `recent`, `rationale`, `impacts` | `adr_refs`, `warnings` |
+| `TASKS` | Immediate next actions | `priority_list` (ordered) | `calendar`, `owner` |
+| `STYLE` | How to behave when resuming | `tone`, `communication`, `preferences` | `anti_patterns`, `guardrails` |
+
+The OPTIONAL `<OPTIONAL>` block extends the payload with telemetry (`checksum`, `session`, `vendor`, etc.) but never replaces the CORE blocks.
+
+## 5. Serialization Format
+1. Snapshots **MUST** use the exact wrapper:  
+   ```
+   <RL4-CODEX v="1.0">
+     ...
+   </RL4-CODEX>
+   ```
+2. Blocks **MUST** appear in this canonical order: `IDENTITY`, `STATE`, `GOALS`, `CONTEXT`, `DECISIONS`, `TASKS`, `STYLE`, `OPTIONAL` (optional).  
+3. Each block contains short clauses separated by ` | `. Clauses use `label=value` or `label:comma-list`. Example: `mode=focus | phase=design`.  
+4. Whitespace between blocks is flexible; indentation is optional.  
+5. Encoders **MUST NOT** include HTML entities, Markdown formatting, or list bullets inside the block content.  
+6. Only ASCII characters are permitted; UTF-8 emoji **MAY** be used in OPTIONAL but should be avoided for maximum compatibility.  
+7. Duplicate labels inside the same block are invalid.
+
+## 6. Core Field Definitions
+
+### 6.1 IDENTITY
+- `persona` (**MUST**) — Short description of the active role (e.g., “Lead Backend Engineer”).  
+- `project` (**MUST**) — High-level project nickname or hashed identifier.  
+- `style` (**MUST**) — Desired interaction style (`decisive`, `mentor`, `fast`).  
+- OPTIONAL: `timezone`, `language`, `links` (comma list of canonical references).
+
+### 6.2 STATE
+- `mode` (**MUST**) — `focus`, `explore`, `debug`, or `planning`.  
+- `phase` (**MUST**) — Custom label for the current project phase.  
+- `focus` (**MUST**) — Single sentence describing cognitive focus.  
+- `energy` (**MUST**) — `high`, `steady`, or `low`.  
+- OPTIONAL: `risks`, `confidence` (0–1 float).
+
+### 6.3 GOALS
+- `short_term` (**MUST**) — Up to three bullet-equivalent phrases separated by commas.  
+- `long_term` (**MUST**) — Persistent north-star objectives.  
+- OPTIONAL: `done`, `blocked`.
+
+### 6.4 CONTEXT
+- `constraints` (**MUST**) — Policies, deadlines, or non-negotiables.  
+- `assets` (**MUST**) — Key artifacts (documents, repos) described abstractly.  
+- `stakeholders` (**MUST**) — Who must be satisfied; names may be hashed.  
+- OPTIONAL: `tools`, `repos`, `notes`.
+
+### 6.5 DECISIONS
+- `recent` (**MUST**) — Latest decision made (short clause).  
+- `rationale` (**MUST**) — Why the decision stands.  
+- `impacts` (**MUST**) — Expected outcomes or trade-offs.  
+- OPTIONAL: `adr_refs`, `warnings`.
+
+### 6.6 TASKS
+- `priority_list` (**MUST**) — Ordered actions encoded as `1) ... ; 2) ...`.  
+- OPTIONAL: `calendar` (relative timing), `owner`.
+
+### 6.7 STYLE
+- `tone` (**MUST**) — e.g., `direct`, `supportive`, `technical`.  
+- `communication` (**MUST**) — Preferred cadence or format.  
+- `preferences` (**MUST**) — Reusable heuristics (e.g., “cite specs before coding”).  
+- OPTIONAL: `anti_patterns`, `guardrails`.
+
+### 6.8 OPTIONAL Block
+- Extensible container for telemetry such as `checksum`, `session`, `vendor`, `ext.note`.  
+- MUST only appear after STYLE.  
+- MUST remain under 512 characters.
+
+## 7. Size & Performance
+- Total payload **MUST NOT** exceed 10,240 bytes.  
+- Encoders **SHOULD** keep payloads under 4,096 bytes.  
+- Blocks with more than 512 characters SHOULD be summarized further.  
+- Truncated payloads MUST still include all CORE blocks even if their contents degrade to `field=UNKNOWN`.
+
+## 8. Versioning & Compatibility
+- `v` attribute declares the snapshot format. v1.0 is the baseline.  
+- Future versions may add new blocks or fields but MUST preserve existing semantics.  
+- Decoders encountering newer versions MUST attempt to parse known blocks and treat unknown blocks as extensions.  
+- Encoders targeting older decoders MAY down-level by removing unknown fields while keeping canonical order.
+
+## 9. Error Handling
+- **Missing Block** — Payload is invalid; loader MUST request re-encode.  
+- **Missing Field** — Loader MUST treat as `field=UNKNOWN` and warn the user.  
+- **Duplicate Field** — Loader MUST keep the first occurrence and warn about duplicates.  
+- **Malformed Clause** — Loader MUST skip the clause, note the error, and continue if at least one valid clause remains per block.  
+- **Oversized Payload** — Loader SHOULD instruct the user to compress or split GOALS/TASKS.  
+- **Unknown Block** — Loader MUST ignore it but MAY echo it back untouched.
+
+## 10. Example Snapshot
 ```
-<RL4-CODEX v="1.2">
-  <DATA>...</DATA>
-  <TIMELINE>...</TIMELINE>
-  <CONTEXT>...</CONTEXT>
-  <INSIGHTS>...</INSIGHTS>
-  <DECISIONS>...</DECISIONS>
-  <OPTIONAL>...</OPTIONAL> <!-- optional -->
+<RL4-CODEX v="1.0">
+  <IDENTITY>
+    persona=Lead Backend Engineer | project=NovaPay API rewrite | style=decisive
+  </IDENTITY>
+  <STATE>
+    mode=focus | phase=stabilization | focus=eliminate latency regressions | energy=steady
+    | risks=cache-invalidation, api-downtime
+  </STATE>
+  <GOALS>
+    short_term=ship hotfix, finish perf tests, sync with mobile team
+    | long_term=reach p95<120ms, enable zero-downtime deploys
+  </GOALS>
+  <CONTEXT>
+    constraints=PCI scope, downtime<30s | assets=perf dashboard, incident log
+    | stakeholders=payments squad, compliance lead
+  </CONTEXT>
+  <DECISIONS>
+    recent=freeze feature flags | rationale=reduce moving parts
+    | impacts=slower roadmap but safer rollout
+  </DECISIONS>
+  <TASKS>
+    priority_list=1) patch redis cluster ; 2) rerun soak tests ; 3) write rollout note
+  </TASKS>
+  <STYLE>
+    tone=direct | communication=bullet updates hourly | preferences=cite metrics before opinions
+  </STYLE>
+  <OPTIONAL>
+    session=hash#81aa | checksum=sha1#902fe1
+  </OPTIONAL>
 </RL4-CODEX>
 ```
-Whitespace is flexible; indentation is not prescribed.
 
-### 5.2 Size Guarantees
-- Total payload **MUST NOT** exceed 10,240 bytes.  
-- Encoders **SHOULD** target ≤ 4,096 bytes; decoders **MUST** support up to the hard limit.  
-- OPTIONAL blocks **MUST NOT** exceed 512 characters combined.
-
-### 5.3 Token Grammar
-```
-payload      := "<RL4-CODEX v=\"1.2\">" blocks "</RL4-CODEX>"
-blocks       := data timeline context insights decisions optional?
-stream       := token (separator token)*
-token        := label [ "=" value ] | label ":" value | symbol
-separator    := " | " | " , "
-```
-JSON, YAML, base64 blobs, or raw text excerpts are forbidden.
-
-## 6. Block Specifications
-Each block is a token stream. Within a block, tokens **SHOULD** be ordered from most to least recent relevance, breaking ties alphabetically.
-
-### 6.1 DATA — Current Cognitive State
-- MUST describe: `project hash`, `mode` (`strict`, `normal`, `flexible`, `exploratory`), `phase`, `task counts`, `KPI set`, `cognitive health score (0–1)`, `maturity tier`.  
-- MAY include additional hashed indicators (e.g., `focus`, `energy`).  
-- Example tokens: `proj#7fa2`, `mode=strict`, `phase=build`, `tasks=3.active/7.total`, `kpi:velocity=steady`, `cog.health=0.82`.
-
-### 6.2 TIMELINE — Recent Activity (24–48h)
-- MUST include `cycles`, `action mix`, `bursts/droughts`, `hotspot hashes`, and `temporal anomalies`.  
-- SHOULD avoid timestamps; use symbolic descriptors (`night-shift`, `idle-dip`).  
-- Example tokens: `cycles=5`, `actions=edit+analysis`, `bursts=2`, `hotspots=mod#a913`, `anomalies=idle-dip`.
-
-### 6.3 CONTEXT — Stable Metadata
-- MUST include project type, hashed stack descriptors, developer profile signals, constraints, success criteria, reasoning style, and risk posture.  
-- Example tokens: `type=fullstack`, `stack=hash(fe,api,llm)`, `devDNA=focus/iterative`, `constraints=strict-zero-content`, `risk=drift-low`.
-
-### 6.4 INSIGHTS — Cognitive Signals
-- MUST encode patterns, correlations, forecasts, and trend signals.  
-- Format: `pattern:<name>(weight=x.xx,conf=y.yy)` or `trend:<name>(conf=y.yy)`.  
-- Weights and confidences MUST be normalized floats between 0 and 1 (two decimal precision).  
-- Literal snippets or stack traces are prohibited.
-
-### 6.5 DECISIONS — High-Level Decision Context
-- MUST reference hashed ADR identifiers, drift signals (`plan`, `task`, `phase`), detected anomalies, integrity status (`green`, `amber`, `red`), and recommended adjustments.  
-- Adjustments MUST be semantic (e.g., `adjust=stabilize-context-cache`).  
-- DECISIONS MUST capture the “reasoning climate” at the time of encoding.
-
-### 6.6 OPTIONAL — Vendor Metadata (v1.2 Enhancements)
-The OPTIONAL block MAY include the following fields, each expressed as tokens:
-- `vendor` — identifier of encoder implementation.  
-- `encoder` — hashed agent or model reference.  
-- `session` — stable fingerprint for continuity.  
-- `checksum` — hash of the payload body (excluding `<RL4-CODEX>` wrapper).  
-- `policy` — reference to governance policy hash.  
-- Any additional tokens MUST stay under the OPTIONAL size budget and MUST NOT leak raw data.
-
-Encoders MAY omit `<OPTIONAL>` entirely. If present, it MUST appear last.
-
-## 7. Hashing and Zero-Content Rules
-1. All identifiers for projects, modules, branches, ADRs, users, or files **MUST** be hashed using a deterministic function (minimum 64-bit entropy) and prefixed with a namespace (`proj#`, `mod#`, `adr#`).  
-2. Raw filenames, code snippets, commit messages, timestamps, or stack traces **MUST NOT** appear anywhere in the payload.  
-3. KPI names **SHOULD** use generic labels (`velocity`, `latency`, `quality`).  
-4. When referencing technologies, encoders MUST normalize to abstract tokens (e.g., `stack=hash(fe,api,llm)` instead of `React+Node`).  
-5. Payloads containing un-hashed PII or source content MUST be rejected by validators.
-
-## 8. Deterministic Serialization Procedure
-1. Gather the latest CognitiveState inputs.  
-2. Normalize signals into token/value pairs.  
-3. Sort tokens within each block alphabetically unless a recency order is defined (TIMELINE, INSIGHTS).  
-4. Concatenate tokens using ` | ` separators; avoid trailing separators.  
-5. Assemble blocks in canonical order, omitting `<OPTIONAL>` if empty.  
-6. Prepend the XML header `<RL4-CODEX v="1.2">` and append the closing tag.  
-7. Run validation (Section 10). If any rule fails, encoders MUST NOT emit the payload.
-
-## 9. Forward Compatibility
-- Decoders MUST ignore and preserve unknown tags or tokens.  
-- Encoders MUST NOT introduce new required blocks without versioning the protocol.  
-- Optional tokens **SHOULD** declare namespaces when extending semantics (`ext.foo=bar`).  
-- When down-converting to v1.1, encoders MUST remove v1.2-only fields but retain the five required blocks.
-
-## 10. Validation Algorithm (Pseudo-code)
-```
-function validate(payload):
-  assert payload.startsWith("<RL4-CODEX")
-  blocks = parseBlocks(payload)
-  required = ["DATA","TIMELINE","CONTEXT","INSIGHTS","DECISIONS"]
-  for name in required:
-    assert name in blocks and len(blocks[name]) > -1
-  assert blocks are in canonical order
-  assert byteLength(payload) <= 10240
-  for block in blocks:
-    assert no raw code/text patterns (regex checks)
-    assert all identifiers match namespace#hash
-  if "OPTIONAL" in blocks:
-    assert len(blocks["OPTIONAL"]) <= 512 chars
-  return VALID
-```
-Encoders MUST implement equivalent logic; decoders SHOULD re-run validation before consuming the payload.
-
-## 11. Error Handling
-- **Missing Block**: treat payload as invalid; decoders MAY attempt partial reconstruction but MUST emit `ERROR:missing-block:<name>`.  
-- **Size Exceeded**: reject payload with `ERROR:size-exceeded`.  
-- **Hash Violation**: reject payload; report offending token.  
-- **Unknown Version**: decoders MAY parse but MUST warn `WARN:unsupported-version`.  
-- **Optional Block Overflow**: ignore excess tokens beyond 512 chars and warn `WARN:optional-truncated`.
-
-## 12. Compliance Tests
-Implementations MUST pass the following reference tests:
-1. **Canonical Order Test**: shuffle blocks and confirm validator rejects.  
-2. **Hash Enforcement Test**: inject raw filename, ensure rejection.  
-3. **Size Test**: feed payload >10,240 bytes, expect failure.  
-4. **Forward Compatibility Test**: add `<FUTURE>` tag; decoder ignores it while keeping data intact.  
-5. **Optional Block Test**: include checksum + fingerprint; ensure decoder surfaces them without affecting required blocks.  
-6. **Partial Data Test**: remove non-critical tokens inside DATA; decoder fills `UNKNOWN` and continues.
-
-## 13. Security and Privacy Considerations
-- Payloads MUST never leak proprietary content, secrets, or identifiers that can be reverse-engineered.  
-- Hashes SHOULD use salt or namespace segregation when multiple organizations share the same pipeline.  
-- Encoders SHOULD encrypt payloads at rest or in transit if required by policy; RL4-CODEX itself remains plaintext for interoperability.  
-- OPTIONAL fingerprints MUST NOT be derived from unhashed user data.
-
-## 14. Versioning Policy
-- RL4-CODEX v1.2 is backward compatible with v1.1; decoders MUST accept v1.1 unless explicitly limited.  
-- Minor releases (v1.x) MAY add OPTIONAL tokens or clarifications but MUST NOT break canonical ordering.  
-- Major releases (v2.x) MAY redefine structure; encoders MUST update the `v` attribute accordingly.  
-- Change history is tracked in repository commits; see README for version roadmap.
-
-## 15. License
-RL4-CODEX is distributed under the MIT License to encourage broad adoption and ecosystem growth.
+## 11. Validation Checklist
+Encoders SHOULD run the following before sharing a snapshot:
+1. All CORE blocks present and non-empty.  
+2. Field count per block ≤ 8 (to maintain readability).  
+3. Payload length < 4 KB (warning issued if above).  
+4. No raw credentials, code, or file paths.  
+5. Clauses use only ASCII punctuation and avoid Markdown bullets.  
+6. OPTIONAL block, if present, follows STYLE and stays under 512 characters.
 
 ---
 
-**End of RL4-CODEX v1.2 Specification**
+**End of RL4-CODEX v1.0 Specification**
 
