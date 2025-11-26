@@ -1,0 +1,27 @@
+<RL4-CODEX v="1.1">
+  <DATA>
+    proj#9fa1 | mode=strict | phase=automation
+    tasks=1.active/8.total | kpi:build-pass=0.97
+    kpi:latency=0.42 | cog.health=0.79 | maturity=ci-m3
+  </DATA>
+  <TIMELINE>
+    cycles=7 | actions=commit+analysis+idle
+    bursts=nightly-ci | droughts=dev-morning
+    hotspots=pipeline#c812,agent#aa52 | anomalies=retry-spike
+  </TIMELINE>
+  <CONTEXT>
+    project=backend-pipeline | stack=hash(ci,containers,llm)
+    devDNA=automation-first | constraints=10kb-cap
+    success=stable-ci | reasoning=telemetry-driven | risk=latency-climb
+  </CONTEXT>
+  <INSIGHTS>
+    pattern:retry-loop(weight=0.58)
+    trend:latency-up(conf=0.62)
+    forecast:maintenance-window(conf=0.74)
+  </INSIGHTS>
+  <DECISIONS>
+    adr#1da0 | drift=plan-none | anomaly=latency-drift
+    integrity=green | adjustment=scale-cache-layers
+  </DECISIONS>
+</RL4-CODEX>
+

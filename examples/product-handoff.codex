@@ -1,0 +1,30 @@
+<RL4-CODEX v="1.1">
+  <DATA>
+    proj#d3a9 | mode=flexible | phase=handoff
+    tasks=2.active/5.total | kpi:velocity=0.78 | kpi:focus=0.91
+    cog.health=0.86 | maturity=build-iter3
+  </DATA>
+  <TIMELINE>
+    cycles=4 | actions=edit+refactor+analysis
+    bursts=pm-late | droughts=early-am
+    hotspots=ui#57aa,logic#1f2c | anomalies=context-swap
+  </TIMELINE>
+  <CONTEXT>
+    project=fullstack-app | stack=hash(fe-react,api-rust,llm)
+    devDNA=structured-handoff | constraints=strict-zero-content
+    success=ship-refactor | reasoning=plan-first | risk=handoff-drift
+  </CONTEXT>
+  <INSIGHTS>
+    pattern:review-churn(weight=0.64,conf=0.73)
+    correlation:tests-vs-focus(+0.41)
+    forecast:phase-shift-ready(conf=0.69)
+  </INSIGHTS>
+  <DECISIONS>
+    adr#4b32 | drift=task-micro | anomaly=handoff-gap
+    integrity=amber | adjustment=freeze-noncritical-edits
+  </DECISIONS>
+  <OPTIONAL>
+    session=fingerprint#aa71 | encoder=agent-gpt
+  </OPTIONAL>
+</RL4-CODEX>
+

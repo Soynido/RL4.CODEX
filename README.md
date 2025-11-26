@@ -10,6 +10,7 @@ RL4-CODEX permet de déplacer l’état cognitif d’un projet **sans transfére
 - `spec.md` — texte intégral du standard v1.1 (référence normative unique).
 - `specs/plan.md` — feuille de route stratégique (phases et contraintes).
 - `specs/tasks.md` — registre de tâches numérotées (traçabilité 1 commit = 1 tâche).
+- `examples/` — payloads RL4-CODEX prêts à tester avec leur guide d’utilisation.
 
 > Les fichiers de gouvernance sont volontairement discrets afin que le dépôt public reste concentré sur la spec.
 
@@ -67,6 +68,11 @@ Ce payload respecte la taille compacte, l’anonymisation par hash, et démontre
 - **Restauration IDE** : redonner à une extension VS Code l’état d’un chat précédent après rechargement.  
 - **Audit externe** : partager un snapshot normalisé avec une équipe sécurité sans diffuser du code.  
 - **Handoff produit** : téléporter la mémoire d’un build en cours vers un autre device/agent en quelques secondes.
+
+## Exemples prêts à l’emploi
+- `examples/product-handoff.codex` : snapshot conçu pour passer le relais d’un sprint (inclut `<OPTIONAL>` avec fingerprint).  
+- `examples/ci-health.codex` : suivi de pipeline CI sur 24 h, idéal pour vérifier vos encodeurs automatiques.  
+- `examples/README.md` : mode d’emploi, bonnes pratiques et check-list de validation.
 
 ## Tester ou intégrer rapidement
 - **LLM Sandbox** : copiez l’exemple ci-dessus dans n’importe quel modèle et demandez-lui d’agir en décodeur via le prompt §12.  
